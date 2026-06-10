@@ -24,7 +24,7 @@ pipeline {
             steps {
                 echo 'Compilation du projet...'
                 // TODO : Ajouter la commande Maven pour nettoyer et compiler le projet (sans lancer les tests)
-                // sh '...'
+                sh 'mvn clean compile -DskipTests'
             }
         }
 
@@ -32,12 +32,12 @@ pipeline {
             steps {
                 echo 'Exécution des tests et génération du rapport JaCoCo...'
                 // TODO : Ajouter la commande Maven pour lancer les tests
-                // sh '...'
+                sh 'mvn test'
             }
             post {
                 always {
                     // TODO : Indiquer à Jenkins où récupérer les rapports de tests au format XML (indice : plugin junit)
-                    // junit '...'
+                    junit 'target/surefire-reports/*.xml'
                 }
             }
         }
@@ -50,8 +50,12 @@ pipeline {
             steps {
                 echo 'Analyse de la qualité du code avec SonarQube...'
                 // TODO : Ajouter la commande Maven pour lancer l'analyse SonarQube
-                // N'oubliez pas de passer les propriétés : sonar.projectKey, sonar.host.url et sonar.login
-                // sh '...'
+                sh """
+                    mvn sonar:sonar \
+                        -Dsonar.projectKey=bad-practices-app \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.login=${SONAR_TOKEN}
+                """
             }
         }
 
@@ -59,6 +63,9 @@ pipeline {
             steps {
                 // TODO : Ajouter l'étape pour attendre le résultat du Quality Gate de SonarQube
                 // Indice : Il faut utiliser un 'timeout' englobant 'waitForQualityGate abortPipeline: true'
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
                 
             }
         }
@@ -68,10 +75,11 @@ pipeline {
                 echo 'Création du JAR exécutable et de l\'image Docker...'
                 
                 // TODO : Ajouter la commande Maven pour créer le package complet (JAR) en ignorant les tests
-                // sh '...'
+                sh 'mvn package -DskipTests'
+
                 
                 // TODO : Ajouter la commande Docker pour construire l'image avec le tag "epsi/bad-practices-app:latest"
-                // sh '...'
+                sh 'docker build -t epsi/bad-practices-app:latest .'
             }
         }
     }
