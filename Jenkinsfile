@@ -49,7 +49,7 @@ pipeline {
             }
             steps {
                 echo 'Analyse de la qualité du code avec SonarQube...'
-                // TODO : Ajouter la commande Maven pour lancer l'analyse SonarQube
+                
                 withSonarQubeEnv('SonarQube') {
                 sh """
                     mvn sonar:sonar \
@@ -58,6 +58,7 @@ pipeline {
                         -Dsonar.login=${SONAR_TOKEN}
                 """
             }
+        }
         }
 
         stage('Quality Gate') {
