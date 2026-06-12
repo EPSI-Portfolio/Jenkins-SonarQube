@@ -2,96 +2,87 @@ package com.epsi.tp;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
-// Mauvaise pratique : import inutilisé
-import java.util.List;
-import java.util.ArrayList;
+import java.sql.SQLException;
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class UserService {
 
-    // Faille de sécurité majeure : mot de passe en dur
-    private String DB_PASSWORD = "super_secret_password_123!";
-    
-    // Mauvaise pratique : variable inutilisée
-    private int unusedCounter = 0;
+    // Correction : utilisation d'un Logger au lieu de System.out.println
+    private static final Logger LOGGER = Logger.getLogger(UserService.class.getName());
+
+    // Correction : le secret n'est plus dans le code source.
+    // Il est lu depuis l'environnement d'exécution (variable d'environnement),
+    // injecté au déploiement (ex : docker run -e DB_PASSWORD=...).
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/mydb";
+    private static final String DB_USER = "root";
+    private static final String DB_PASSWORD = System.getenv("DB_PASSWORD");
+    private static final String ADMIN_PASSWORD = System.getenv("ADMIN_PASSWORD");
 
     public void login(String username, String password) {
-        // Mauvaise pratique : variable locale inutilisée
-        boolean isLoggedIn = false;
-        
-        // Mauvaise pratique : System.out.println au lieu d'un Logger
-        System.out.println("Tentative de connexion de l'utilisateur : " + username);
+        // Correction : Logger paramétré au lieu de concaténation + System.out
+        LOGGER.log(Level.INFO, "Tentative de connexion de l''utilisateur : {0}", username);
 
-        // Mauvaise pratique : identifiants en dur dans le code
-        if (username.equals("admin") && password.equals("admin")) {
-            System.out.println("Administrateur connecté avec succès.");
-            isLoggedIn = true;
+        // Correction : plus d'identifiants en dur, le mot de passe admin
+        // vient de l'environnement. Objects.equals évite les NullPointerException.
+        if ("admin".equals(username) && ADMIN_PASSWORD != null
+                && Objects.equals(password, ADMIN_PASSWORD)) {
+            LOGGER.info("Administrateur connecté avec succès.");
         } else {
-            System.out.println("Identifiants invalides.");
+            LOGGER.warning("Identifiants invalides.");
         }
-        
-        try {
-            // Logique factice pour déclencher une exception
-            int result = 10 / 0;
-        } catch (Exception e) {
-            // Mauvaise pratique : bloc catch vide (l'erreur est ignorée silencieusement)
-        }
+        // Correction : suppression du code factice (division par zéro)
+        // et du bloc catch vide qui avalait l'erreur silencieusement.
     }
 
     public void getUserDetails(String username) {
-        Connection conn = null;
-        Statement stmt = null;
-        ResultSet rs = null;
+        // Correction : requête paramétrée (PreparedStatement) -> injection SQL impossible,
+        // l'entrée utilisateur ne peut plus être interprétée comme du code SQL.
+        String query = "SELECT * FROM users WHERE username = ?";
 
-        try {
-            // Faille : mot de passe en dur utilisé ici
-            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/mydb", "root", DB_PASSWORD);
-            stmt = conn.createStatement();
-            
-            // Faille de sécurité majeure : Injection SQL possible via concaténation
-            String query = "SELECT * FROM users WHERE username = '" + username + "'";
-            rs = stmt.executeQuery(query);
-            
-            while (rs.next()) {
-                System.out.println("Utilisateur trouvé : " + rs.getString("username"));
+        // Correction : try-with-resources -> les ressources JDBC sont fermées
+        // automatiquement, même en cas d'exception (plus de fuite de ressources,
+        // plus de finally avec des catch vides).
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+            pstmt.setString(1, username);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    String foundUser = rs.getString("username");
+                    LOGGER.log(Level.INFO, "Utilisateur trouvé : {0}", foundUser);
+                }
             }
-        } catch (Exception e) {
-            // Mauvaise pratique : on attrape une exception générique et on print la stacktrace sans logger
-            e.printStackTrace();
-        } finally {
-            // Mauvaise pratique : gestion archaïque des ressources (pas de try-with-resources)
-            // avec des catch vides
-            if (rs != null) {
-                try { rs.close(); } catch (Exception e) {}
-            }
-            if (stmt != null) {
-                try { stmt.close(); } catch (Exception e) {}
-            }
-            if (conn != null) {
-                try { conn.close(); } catch (Exception e) {}
-            }
+        } catch (SQLException e) {
+            // Correction : exception spécifique (SQLException) au lieu d'Exception,
+            // et journalisation via le Logger au lieu de printStackTrace().
+            LOGGER.log(Level.SEVERE, "Erreur lors de la récupération de l''utilisateur", e);
         }
     }
-    
-    // Mauvaise pratique : méthode inutilement complexe avec de nombreux "if" imbriqués (complexité cyclomatique élevée)
+
+    // Correction : la complexité cyclomatique est réduite en extrayant la logique
+    // dans une méthode privée à retours anticipés (early returns), sans imbrication.
     public void complexMethod(int a, int b, int c) {
-        if (a > 0) {
-            if (b > 0) {
-                if (c > 0) {
-                    System.out.println("Tous positifs");
-                } else {
-                    System.out.println("C est négatif");
-                }
-            } else {
-                if (c > 0) {
-                    System.out.println("B est négatif");
-                } else {
-                    System.out.println("B et C sont négatifs");
-                }
-            }
-        } else {
-            System.out.println("A est négatif");
+        LOGGER.info(buildSignMessage(a, b, c));
+    }
+
+    private String buildSignMessage(int a, int b, int c) {
+        if (a <= 0) {
+            return "A est négatif";
         }
+        if (b > 0 && c > 0) {
+            return "Tous positifs";
+        }
+        if (b > 0) {
+            return "C est négatif";
+        }
+        if (c > 0) {
+            return "B est négatif";
+        }
+        return "B et C sont négatifs";
     }
 }
