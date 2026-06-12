@@ -41,7 +41,7 @@ public class UserService {
     public void getUserDetails(String username) {
         // Correction : requête paramétrée (PreparedStatement) -> injection SQL impossible,
         // l'entrée utilisateur ne peut plus être interprétée comme du code SQL.
-        String query = "SELECT * FROM users WHERE username = ?";
+        String query = "SELECT username FROM users WHERE username = ?";
 
         // Correction : try-with-resources -> les ressources JDBC sont fermées
         // automatiquement, même en cas d'exception (plus de fuite de ressources,
@@ -67,7 +67,7 @@ public class UserService {
     // Correction : la complexité cyclomatique est réduite en extrayant la logique
     // dans une méthode privée à retours anticipés (early returns), sans imbrication.
     public void complexMethod(int a, int b, int c) {
-        LOGGER.info(buildSignMessage(a, b, c));
+        LOGGER.info(() -> buildSignMessage(a, b, c));
     }
 
     private String buildSignMessage(int a, int b, int c) {
